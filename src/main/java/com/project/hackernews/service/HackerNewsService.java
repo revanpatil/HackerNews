@@ -2,7 +2,6 @@ package com.project.hackernews.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.hackernews.dao.PastStoryRepository;
-import com.project.hackernews.dao.TopStoryRepository;
 import com.project.hackernews.model.Comment;
 import com.project.hackernews.model.PastStory;
 import com.project.hackernews.model.TopStory;
@@ -32,8 +31,8 @@ public class HackerNewsService {
     private static final String COMMENT_API_URL = "https://hacker-news.firebaseio.com/v0/item/%d.json";
     private final RestTemplate restTemplate;
     Set<Integer> addedStoryIds = new HashSet<>();
-    @Autowired
-    private TopStoryRepository topStoryRepository;
+//    @Autowired
+//    private TopStoryRepository topStoryRepository;
     @Autowired
     private PastStoryRepository pastStoryRepository;
     @Autowired
@@ -43,8 +42,7 @@ public class HackerNewsService {
         restTemplate = new RestTemplate();
     }
 
-    @Scheduled(fixedRate = 900000) // fetch data every 15 minutes (900000 milliseconds)
-    public void fetchTopStories() throws IOException {
+    public List<TopStory> fetchTopStories() throws IOException {
 
         // Get the IDs of the top stories
         String topStoriesUrl = API_BASE_URL + "topstories.json";
@@ -75,23 +73,21 @@ public class HackerNewsService {
         // Sort the top stories by score, null values last
        Collections.sort(topStories, Comparator.nullsLast((d1, d2) -> Integer.compare(d2.getScore(), d1.getScore())));
 
+        List<TopStory> updatedList = new ArrayList<>();
+        System.out.println("Api Hit on " + LocalDateTime.now());
 
-
-
-
-        System.out.println("Scheduler started" + LocalDateTime.now());
-        // Save the top 10 stories to the database
-        topStoryRepository.deleteAll(); // delete old data
         for (int i = 0; i < TOP_STORIES_LIMIT; i++) {
-            topStoryRepository.save(topStories.get(i));
+            updatedList.add(topStories.get(i));
         }
-        savePastStories();
+
+        savePastStories(updatedList);
+        return updatedList;
+
     }
 
     //To save 10 Top Story in PastStory
-    public void savePastStories() {
+    public void savePastStories(List<TopStory> topStories) {
         List<PastStory> pastStories = new ArrayList<>();
-        List<TopStory> topStories = getTopStories();
         if (!CollectionUtils.isEmpty(topStories)) {
             for (TopStory story : topStories) {
                 if (!addedStoryIds.contains(story.getId())) {
@@ -103,9 +99,6 @@ public class HackerNewsService {
         }
     }
 
-    public List<TopStory> getTopStories() {
-        return topStoryRepository.findAll();
-    }
 
     public List<PastStory> getPastStories() {
         return pastStoryRepository.findAll();
